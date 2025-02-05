@@ -253,5 +253,57 @@ def main():
                 merged_df = pd.concat([existing_df, new_df], ignore_index=True)
                 
                 # 중복된 학생번호 제거 (최신 데이터 유지)
-                merged_df = merged_df.drop_duplicates(subset=["
+                merged_df = merged_df.drop_duplicates(subset=["학생번호"], keep="last")
+
+                # 병합된 파일 다운로드 버튼 추가
+                merged_csv_file = "merged_grading_results.csv"
+                merged_df.to_csv(merged_csv_file, index=False, encoding="utf-8-sig")
+                
+                st.sidebar.success("✅ 기존 CSV와 병합 완료!")
+                st.sidebar.download_button(
+                    label="📥 병합된 CSV 다운로드",
+                    data=open(merged_csv_file, "rb"),
+                    file_name="merged_grading_results.csv",
+                    mime="text/csv"
+                )
+
+                # 병합된 결과를 데이터프레임으로 표시
+                st.subheader("📊 병합된 채점 결과 미리보기")
+                import ace_tools as ace
+                ace.display_dataframe_to_user(name="병합된 채점 결과", dataframe=merged_df)
+
+            else:
+                st.sidebar.warning("새로 생성된 채점 데이터가 없습니다.")
+
+    with col2:
+        st.header("📊 채점 결과")  
+
+        if st.session_state.results:
+            graph_data = st.session_state.graph_data
+
+            for question, scores in graph_data.items():
+                st.subheader(f"{question} 분포")
+
+                fig, ax = plt.subplots(figsize=(8, 6))
+                score_counts = pd.Series(scores).value_counts().sort_index()
+                ax.bar(score_counts.index, score_counts.values,  # 수정: index를 그대로 사용
+                    color="skyblue", edgecolor="black")
+                ax.set_xlabel("Score")
+                ax.set_ylabel("Number of students")
+                ax.set_title(f"Distribution")
+                ax.grid(True, linestyle="--", alpha=0.6)
+                st.pyplot(fig)
+
+                # Display statistics for each question
+                st.write(f"**{question} 통계 정보:**")
+                st.write(f"- 최고 점수: {max(scores)}")
+                st.write(f"- 최저 점수: {min(scores)}")
+                st.write(f"- 평균 점수: {np.mean(scores):.2f}")
+
+        else:
+            st.info("채점 결과가 아직 없습니다. PDF 파일을 업로드하고 채점을 시작하세요.")
+
+if __name__ == "__main__":
+    main()
+
 
