@@ -9,7 +9,14 @@ import re
 import os
 import subprocess
 
-api_key = st.secrets["general"]["API_KEY"]
+# API 키 불러오기
+api_key = st.secrets.get("general", {}).get("API_KEY", None)
+
+if api_key is None:
+    st.error("API 키가 설정되지 않았습니다. secrets.toml 또는 Streamlit Cloud Secrets에서 설정하세요.")
+else:
+    st.success("API 키가 정상적으로 로드되었습니다.")
+
 
 def extract_and_clean_text(file):
     criteria = extract_text(file).strip()
