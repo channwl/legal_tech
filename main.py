@@ -8,10 +8,14 @@ from pdfminer.high_level import extract_text
 import re
 import os
 import subprocess
-from io import BytesIO
-import os
 
-import streamlit as st
+# 페이지 설정을 가장 먼저 호출
+st.set_page_config(
+    initial_sidebar_state="expanded",
+    layout="wide",
+    page_icon="⚖️",
+    page_title="법률 채점 프로그램 | FELT"
+)
 
 # API 키 불러오기
 api_key = st.secrets.get("general", {}).get("API_KEY", None)
@@ -51,8 +55,6 @@ def parse_scores(result_text, question_count):
     
     return scores
 
-
-
 def get_grading_prompt(question_count):
     """Return appropriate prompts based on number of questions"""
     system_prompt = """
@@ -80,9 +82,8 @@ def get_grading_prompt(question_count):
         5. 점수는 정수로 나타내주세요.
 
         출력 형식은 아래와 같습니다:
-        문제 1
         - 근거 :
-        - 문제 1 총점 : [숫자]
+        - 총점 : [숫자]
         """
     else:
         user_prompt_template = """
@@ -146,21 +147,114 @@ def clear_uploaded_files():
 
     st.write('<meta http-equiv="refresh" content="0; url=/" />', unsafe_allow_html=True)
 
-def merge_uploaded_csvs(uploaded_files):
-    """CSV 파일을 학생번호 기준으로 병합하고 총점을 계산하는 함수"""
-    dataframes = [pd.read_csv(file) for file in uploaded_files]
+def main():
+    col1, col2 = st.columns([3, 2])
 
-    # 학생번호 기준으로 병합
-    merged_df = dataframes[0]
-    for df in dataframes[1:]:
-        merged_df = merged_df.merge(df, on="학생번호", how="outer")
+    with col1:
+        st.header("⚖️ 법률 채점 프로그램 | FELT")
 
-    # NaN 값을 0으로 변환 후 총점 계산
-    score_columns = [col for col in merged_df.columns if col.startswith("문제")]
-    merged_df["총점"] = merged_df[score_columns].fillna(0).sum(axis=1)
+        st.sidebar.title("📂 파일 업로드")
 
-    # 총점을 맨 왼쪽으로 이동
-    column_order = ["총점", "학생번호"] + score_columns
+        if st.button("🗑️ 새로운 문제 채점", type="secondary"):
+            clear_uploaded_files()
+        st.text("새로운 채점이 진행될때 꼭 클릭해주세요!")
+
+        question_count = st.sidebar.radio(
+            "문제 개수를 선택하세요:",
+            options=[1, 2],
+            format_func=lambda x: f"{x}문제",
+            index=0
+        )
+
+        criteria_file = st.sidebar.file_uploader("채점 기준 PDF 파일을 업로드하세요", type=["pdf"], key="criteria_file")
+        answer_files = st.sidebar.file_uploader("학생 답안 PDF 파일을 여러 개 업로드하세요", type=["pdf"], accept_multiple_files=True, key="answer_files")
+
+        if "results" not in st.session_state:
+            st.session_state.results = []
+            st.session_state.graph_data = {}
+
+        if st.sidebar.button("✅ 채점 시작"):
+            st.session_state.results = []
+            st.session_state.graph_data = {}
+
+            if criteria_file is None:
+                st.sidebar.error("채점 기준 파일을 업로드해주세요.")
+                return
+
+            if not answer_files:
+                st.sidebar.error("학생 답안 파일을 업로드해주세요.")
+                return
+
+            with st.spinner("채점 기준을 추출 중입니다..."):
+                criteria_text = extract_and_clean_text(criteria_file)
+
+            results = []
+            graph_data = {}
+            question_scores = {}
+
+            for i, file in enumerate(answer_files):
+                with st.spinner(f"학생 답안 {i + 1} 채점 중입니다..."):
+                    answer_text = extract_text_from_pdf(file)
+                    result = grade_with_openai(criteria_text, answer_text, question_count)
+                    results.append((file.name, result))
+
+                    # Parse scores for graph data
+                    scores = parse_scores(result, question_count)
+                    for question, score in scores.items():
+                        if question not in graph_data:
+                            graph_data[question] = []
+                        graph_data[question].append(score)
+
+                        if question not in question_scores:
+                            question_scores[question] = []
+                        question_scores[question].append(score)
+
+            st.session_state.results = results
+            st.session_state.graph_data = graph_data
+
+            st.subheader("채점 결과")
+            csv_data = []
+
+            for file_name, result in results:
+                st.write(f"**학생 답안 파일명: {file_name}**")
+                st.text(result)
+                st.write("---")
+
+                file_name = file_name.replace('.pdf', '')
+                scores = parse_scores(result, question_count)
+                row_data = {"학생번호": file_name}
+                row_data.update(scores)
+                csv_data.append(row_data)
+
+            if csv_data:
+                csv_df = pd.DataFrame(csv_data)
+                if question_count == 2 and "총점" in csv_df.columns:
+                    csv_df = csv_df.drop(columns=["총점"])
+                csv_file = "grading_results.csv"
+                csv_df.to_csv(csv_file, index=False, encoding="utf-8-sig")
+                st.sidebar.download_button(
+                    label="📥 채점 결과 CSV 다운로드",
+                    data=open(csv_file, "rb"),
+                    file_name="grading_results.csv",
+                    mime="text/csv"
+                )
+        
+        # 기존 CSV 업로드 및 병합 기능 추가
+        st.sidebar.subheader("📂 기존 채점 결과 합치기")
+
+        uploaded_csv = st.sidebar.file_uploader("기존 채점 결과 CSV 파일을 업로드하세요", type=["csv"], key="uploaded_csv")
+
+        if uploaded_csv is not None:
+            existing_df = pd.read_csv(uploaded_csv, encoding="utf-8-sig")
+            
+            # 새로 생성된 채점 결과 CSV 파일과 병합
+            if csv_data:
+                new_df = pd.DataFrame(csv_data)
+                merged_df = pd.concat([existing_df, new_df], ignore_index=True)
+                
+                # 중복된 학생번호 제거 (최신 데이터 유지)
+                merged_df = merged_df.drop_duplicates(subset=["
+학생번호"] + score_columns
     merged_df = merged_df[column_order]
 
     return merged_df
