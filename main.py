@@ -306,3 +306,33 @@ def main():
 if __name__ == "__main__":
     main()
 
+
+import time
+
+def grade_with_openai(guideline, answer, question_count):
+    """Grade answers using OpenAI API with appropriate prompts"""
+    system_prompt, user_prompt_template = get_grading_prompt(question_count)
+
+    # Format user prompt
+    user_prompt = user_prompt_template.format(
+        guideline=guideline,
+        answer=answer
+    )
+
+    try:
+        # API call
+        response = openai.ChatCompletion.create(
+            model="gpt-4",  # 'gpt-4o' 대신 'gpt-4'로 수정
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0,
+        )
+        return response["choices"][0]["message"]["content"].strip()
+    except openai.error.RateLimitError:
+        # Rate limit exceeded, retry after a short delay
+        time.sleep(2)  # 2초 대기
+        return grade_with_openai(guideline, answer, question_count)  # 재시도
+
+
