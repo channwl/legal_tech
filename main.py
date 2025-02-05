@@ -11,31 +11,9 @@ import subprocess
 from io import BytesIO
 import os
 
-import streamlit as st
-
-# API 키 불러오기
-api_key = st.secrets.get("general", {}).get("API_KEY", None)
-
-import streamlit as st
-
-# 🚀 이 부분을 스크립트의 가장 위에 위치해야 함!
-st.set_page_config(
-    page_title="Legal Tech AI",
-    page_icon="⚖️",
-    layout="wide"
-)
-
-def main():
-    st.write("Hello, Streamlit!")
-
-if __name__ == "__main__":
-    main()
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 
 
-if api_key is None:
-    st.error("API 키가 설정되지 않았습니다. secrets.toml 또는 Streamlit Cloud Secrets에서 설정하세요.")
-else:
-    st.success("API 키가 정상적으로 로드되었습니다.")
 
 def extract_and_clean_text(file):
     criteria = extract_text(file).strip()
