@@ -1,0 +1,7 @@
+streamlit
+PyPDF2
+openai
+pandas
+matplotlib
+numpy
+pdfminer.six
