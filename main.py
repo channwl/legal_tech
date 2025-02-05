@@ -8,14 +8,8 @@ from pdfminer.high_level import extract_text
 import re
 import os
 import subprocess
-
-# 페이지 설정을 가장 먼저 호출
-st.set_page_config(
-    initial_sidebar_state="expanded",
-    layout="wide",
-    page_icon="⚖️",
-    page_title="법률 채점 프로그램 | FELT"
-)
+from io import BytesIO
+import os
 
 # API 키 불러오기
 api_key = st.secrets.get("general", {}).get("API_KEY", None)
