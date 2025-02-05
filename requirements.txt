@@ -1,4 +1,4 @@
-streamlit
+streamlit==1.26.0
 PyPDF2==3.0.1      # PDF 파일 처리 라이브러리
 openai==0.28.0     # OpenAI API 라이브러리
 pandas==2.1.1      # 데이터 처리 및 분석 라이브러리
