@@ -9,6 +9,14 @@ import re
 import os
 import subprocess
 
+# 페이지 설정을 가장 먼저 호출
+st.set_page_config(
+    initial_sidebar_state="expanded",
+    layout="wide",
+    page_icon="⚖️",
+    page_title="법률 채점 프로그램 | FELT"
+)
+
 # API 키 불러오기
 api_key = st.secrets.get("general", {}).get("API_KEY", None)
 
@@ -16,7 +24,6 @@ if api_key is None:
     st.error("API 키가 설정되지 않았습니다. secrets.toml 또는 Streamlit Cloud Secrets에서 설정하세요.")
 else:
     st.success("API 키가 정상적으로 로드되었습니다.")
-
 
 def extract_and_clean_text(file):
     criteria = extract_text(file).strip()
@@ -47,64 +54,6 @@ def parse_scores(result_text, question_count):
             scores[f"문제{question_num}"] = score
     
     return scores
-
-def get_grading_prompt(question_count):
-    """Return appropriate prompts based on number of questions"""
-    system_prompt = """
-    당신은 법학 서술형 답안을 채점하는 엄격하고 공정한 채점관입니다.
-    모든 채점 기준을 세밀하게 검토하고, 채점 기준에 따른 충족 여부를 명확하게 판단하세요.
-    - 문제가 모호할 경우 항상 보수적으로 판단하고, 학생이 명확히 설명하지 못한 부분은 감점하세요.
-    - 채점기준에 나온 '제n조'가 명시 되어있지않으면 감점하세요.
-    - 채점 기준을 하나씩 다 나눠서 채점해주세요.
-    - 점수 부여 시 근거를 명확하게 확인해주세요.
-    """
-
-    if question_count == 1:
-        user_prompt_template = """
-        채점 기준:
-        {guideline}
-
-        학생 답안:
-        {answer}
-
-        위 정보를 바탕으로:
-        1. 채점 기준에 따라 학생 답안이 얼마나 충족되었는지 평가하세요.
-        2. 채점기준에 나온 '제n조'가 명시 되어있지않으면 감점하세요.
-        3. 채점 기준을 하나씩 다 나눠서 채점해주세요.
-        4. 점수를 부여하고 근거를 명확히 설명해주세요.
-        5. 점수는 정수로 나타내주세요.
-
-        출력 형식은 아래와 같습니다:
-        - 근거 :
-        - 총점 : [숫자]
-        """
-    else:
-        user_prompt_template = """
-        채점 기준:
-        {guideline}
-
-        학생 답안:
-        {answer}
-
-        위 정보를 바탕으로:
-        1. 각 문제(예: 2-1, 2-2)별로 나눠서 채점해주세요.
-        2. 각 채점 기준에 따라 학생 답안이 얼마나 충족되었는지 평가하세요.
-        3. 채점기준에 나온 '제n조'가 명시 되어있지않으면 감점하세요.
-        4. 채점 기준을 하나씩 다 나눠서 채점해주세요.
-        5. 각 문제별 점수를 명시해주세요.
-        6. 점수는 정수로 나타내주세요.
-
-        출력 형식은 아래와 같습니다:
-        문제 2-1
-        - 근거 :
-        - 문제 2-1 총점 : [숫자]
-
-        문제 2-2
-        - 근거 :
-        - 문제 2-2 총점 : [숫자]
-        """
-    
-    return system_prompt, user_prompt_template
 
 def get_grading_prompt(question_count):
     """Return appropriate prompts based on number of questions"""
@@ -199,13 +148,6 @@ def clear_uploaded_files():
     st.write('<meta http-equiv="refresh" content="0; url=/" />', unsafe_allow_html=True)
 
 def main():
-    st.set_page_config(
-        initial_sidebar_state="expanded",
-        layout="wide",
-        page_icon="⚖️",
-        page_title="법률 채점 프로그램 | FELT"
-    )
-
     col1, col2 = st.columns([3, 2])
 
     with col1:
@@ -311,55 +253,5 @@ def main():
                 merged_df = pd.concat([existing_df, new_df], ignore_index=True)
                 
                 # 중복된 학생번호 제거 (최신 데이터 유지)
-                merged_df = merged_df.drop_duplicates(subset=["학생번호"], keep="last")
+                merged_df = merged_df.drop_duplicates(subset=["
 
-                # 병합된 파일 다운로드 버튼 추가
-                merged_csv_file = "merged_grading_results.csv"
-                merged_df.to_csv(merged_csv_file, index=False, encoding="utf-8-sig")
-                
-                st.sidebar.success("✅ 기존 CSV와 병합 완료!")
-                st.sidebar.download_button(
-                    label="📥 병합된 CSV 다운로드",
-                    data=open(merged_csv_file, "rb"),
-                    file_name="merged_grading_results.csv",
-                    mime="text/csv"
-                )
-
-                # 병합된 결과를 데이터프레임으로 표시
-                st.subheader("📊 병합된 채점 결과 미리보기")
-                import ace_tools as ace
-                ace.display_dataframe_to_user(name="병합된 채점 결과", dataframe=merged_df)
-
-            else:
-                st.sidebar.warning("새로 생성된 채점 데이터가 없습니다.")
-
-    with col2:
-        st.header("📊 채점 결과")  
-
-        if st.session_state.results:
-            graph_data = st.session_state.graph_data
-
-            for question, scores in graph_data.items():
-                st.subheader(f"{question} 분포")
-
-                fig, ax = plt.subplots(figsize=(8, 6))
-                score_counts = pd.Series(scores).value_counts().sort_index()
-                ax.bar(score_counts.index, score_counts.values,  # 수정: index를 그대로 사용
-                    color="skyblue", edgecolor="black")
-                ax.set_xlabel("Score")
-                ax.set_ylabel("Number of students")
-                ax.set_title(f"Distribution")
-                ax.grid(True, linestyle="--", alpha=0.6)
-                st.pyplot(fig)
-
-                # Display statistics for each question
-                st.write(f"**{question} 통계 정보:**")
-                st.write(f"- 최고 점수: {max(scores)}")
-                st.write(f"- 최저 점수: {min(scores)}")
-                st.write(f"- 평균 점수: {np.mean(scores):.2f}")
-
-        else:
-            st.info("채점 결과가 아직 없습니다. PDF 파일을 업로드하고 채점을 시작하세요.")
-
-if __name__ == "__main__":
-    main()
