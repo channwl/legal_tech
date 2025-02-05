@@ -11,7 +11,8 @@ import subprocess
 
 import os
 
-openai.api_key = st.secrets["OPENAI_API_KEY"]
+openai.api_key = st.secrets["openai"]["OPENAI_API_KEY"]
+st.write(f"API Key: {api_key}")
 
 
 
