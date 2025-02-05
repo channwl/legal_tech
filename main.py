@@ -20,11 +20,6 @@ st.set_page_config(
 # API 키 불러오기
 api_key = st.secrets.get("general", {}).get("API_KEY", None)
 
-if api_key is None:
-    st.error("API 키가 설정되지 않았습니다. secrets.toml 또는 Streamlit Cloud Secrets에서 설정하세요.")
-else:
-    st.success("API 키가 정상적으로 로드되었습니다.")
-
 def extract_and_clean_text(file):
     criteria = extract_text(file).strip()
     return criteria.strip()
@@ -55,6 +50,8 @@ def parse_scores(result_text, question_count):
     
     return scores
 
+
+
 def get_grading_prompt(question_count):
     """Return appropriate prompts based on number of questions"""
     system_prompt = """
@@ -82,8 +79,9 @@ def get_grading_prompt(question_count):
         5. 점수는 정수로 나타내주세요.
 
         출력 형식은 아래와 같습니다:
+        문제 1
         - 근거 :
-        - 총점 : [숫자]
+        - 문제 1 총점 : [숫자]
         """
     else:
         user_prompt_template = """
@@ -113,8 +111,6 @@ def get_grading_prompt(question_count):
     
     return system_prompt, user_prompt_template
 
-import openai
-
 def grade_with_openai(guideline, answer, question_count):
     """Grade answers using OpenAI API with appropriate prompts"""
     system_prompt, user_prompt_template = get_grading_prompt(question_count)
@@ -125,27 +121,18 @@ def grade_with_openai(guideline, answer, question_count):
         answer=answer
     )
 
-    # Ensure you're using the correct model name (gpt-4 or gpt-3.5-turbo)
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",  # Or "gpt-3.5-turbo" depending on your use case
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
+    # API call
+    response = openai.ChatCompletion.create(
+        model="gpt-4o",  # Using gpt-4o as requested
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
             ],
             temperature=0,
-        )
-        # Return the response content
-        return response['choices'][0]['message']['content'].strip()
-
-    except openai.error.OpenAIError as e:
-        # Handle any OpenAI errors (like rate limits, invalid model, etc.)
-        print(f"Error: {e}")
-        return "An error occurred while grading."
-
+    )
 
     # Return the response content
-    return response['choices'][0]['message']['content'].strip()
+    return response["choices"][0]["message"]["content"].strip()
 
 def clear_uploaded_files():
     """Clear all uploaded files and reset the session state."""
@@ -158,7 +145,39 @@ def clear_uploaded_files():
 
     st.write('<meta http-equiv="refresh" content="0; url=/" />', unsafe_allow_html=True)
 
+def merge_uploaded_csvs(uploaded_files):
+    """CSV 파일을 학생번호 기준으로 병합하고 총점을 계산하는 함수"""
+    dataframes = [pd.read_csv(file) for file in uploaded_files]
+
+    # 학생번호 기준으로 병합
+    merged_df = dataframes[0]
+    for df in dataframes[1:]:
+        merged_df = merged_df.merge(df, on="학생번호", how="outer")
+
+    # NaN 값을 0으로 변환 후 총점 계산
+    score_columns = [col for col in merged_df.columns if col.startswith("문제")]
+    merged_df["총점"] = merged_df[score_columns].fillna(0).sum(axis=1)
+
+    # 총점을 맨 왼쪽으로 이동
+    column_order = ["총점", "학생번호"] + score_columns
+    merged_df = merged_df[column_order]
+
+    return merged_df
+
+def convert_df_to_csv(df):
+    """DataFrame을 CSV 파일로 변환"""
+    output = BytesIO()
+    df.to_csv(output, index=False, encoding="utf-8-sig")
+    return output.getvalue()
+
 def main():
+    st.set_page_config(
+        initial_sidebar_state="expanded",
+        layout="wide",
+        page_icon="⚖️",
+        page_title="법률 채점 프로그램 | FELT"
+    )
+
     col1, col2 = st.columns([3, 2])
 
     with col1:
@@ -249,45 +268,26 @@ def main():
                     file_name="grading_results.csv",
                     mime="text/csv"
                 )
-        
-        # 기존 CSV 업로드 및 병합 기능 추가
-        st.sidebar.subheader("📂 기존 채점 결과 합치기")
-
-        uploaded_csv = st.sidebar.file_uploader("기존 채점 결과 CSV 파일을 업로드하세요", type=["csv"], key="uploaded_csv")
-
-        if uploaded_csv is not None:
-            existing_df = pd.read_csv(uploaded_csv, encoding="utf-8-sig")
-            
-            # 새로 생성된 채점 결과 CSV 파일과 병합
-            if csv_data:
-                new_df = pd.DataFrame(csv_data)
-                merged_df = pd.concat([existing_df, new_df], ignore_index=True)
                 
-                # 중복된 학생번호 제거 (최신 데이터 유지)
-                merged_df = merged_df.drop_duplicates(subset=["학생번호"], keep="last")
+        st.sidebar.subheader("📂 CSV 파일 업로드 및 병합")
+        uploaded_csvs = st.sidebar.file_uploader("채점 결과 CSV 파일을 업로드하세요", type=["csv"], accept_multiple_files=True)
 
-                # 병합된 파일 다운로드 버튼 추가
-                merged_csv_file = "merged_grading_results.csv"
-                merged_df.to_csv(merged_csv_file, index=False, encoding="utf-8-sig")
-                
-                st.sidebar.success("✅ 기존 CSV와 병합 완료!")
-                st.sidebar.download_button(
-                    label="📥 병합된 CSV 다운로드",
-                    data=open(merged_csv_file, "rb"),
-                    file_name="merged_grading_results.csv",
-                    mime="text/csv"
-                )
+        if uploaded_csvs:
+            merged_df = merge_uploaded_csvs(uploaded_csvs)
+            st.subheader("📊 병합된 채점 결과")
+            st.write(merged_df)
 
-                # 병합된 결과를 데이터프레임으로 표시
-                st.subheader("📊 병합된 채점 결과 미리보기")
-                import ace_tools as ace
-                ace.display_dataframe_to_user(name="병합된 채점 결과", dataframe=merged_df)
-
-            else:
-                st.sidebar.warning("새로 생성된 채점 데이터가 없습니다.")
+            st.sidebar.download_button(
+                label="📥 병합된 채점 결과 CSV 다운로드",
+                data=convert_df_to_csv(merged_df),
+                file_name="merged_grading_results.csv",
+                mime="text/csv",
+            )
+        else:
+            st.sidebar.info("CSV 파일을 업로드하면 학생번호 기준으로 데이터를 병합할 수 있습니다.")
 
     with col2:
-        st.header("📊 채점 결과")  
+        st.header("📊 채점 결과")
 
         if st.session_state.results:
             graph_data = st.session_state.graph_data
@@ -316,5 +316,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
