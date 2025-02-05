@@ -11,8 +11,9 @@ import subprocess
 from io import BytesIO
 import os
 
-# API 키 불러오기
-api_key = st.secrets.get("general", {}).get("API_KEY", None)
+openai.api_key = st.secrets["OPENAI_API_KEY"]
+
+
 
 def extract_and_clean_text(file):
     criteria = extract_text(file).strip()
