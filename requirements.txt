@@ -1,7 +1,7 @@
-streamlit
-PyPDF2
-openai
-pandas
-matplotlib
-numpy
-pdfminer.six
+streamlit==1.26.0  # Streamlit의 최신 버전을 기준으로 설정
+PyPDF2==3.0.1      # PDF 파일 처리 라이브러리
+openai==0.28.0     # OpenAI API 라이브러리
+pandas==2.1.1      # 데이터 처리 및 분석 라이브러리
+matplotlib==3.8.0  # 시각화 라이브러리
+numpy==1.26.0      # 수치 계산 라이브러리
+pdfminer.six==20221105  # PDF 텍스트 추출 라이브러리
