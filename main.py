@@ -113,6 +113,8 @@ def get_grading_prompt(question_count):
     
     return system_prompt, user_prompt_template
 
+import openai
+
 def grade_with_openai(guideline, answer, question_count):
     """Grade answers using OpenAI API with appropriate prompts"""
     system_prompt, user_prompt_template = get_grading_prompt(question_count)
@@ -123,18 +125,18 @@ def grade_with_openai(guideline, answer, question_count):
         answer=answer
     )
 
-    # API call
+    # Ensure you're using the correct model name
     response = openai.ChatCompletion.create(
-        model="gpt-4",  # Using gpt-4 as requested
+        model="gpt-4",  # Use the correct model name here
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
-            ],
-            temperature=0,
+        ],
+        temperature=0,
     )
 
     # Return the response content
-    return response["choices"][0]["message"]["content"].strip()
+    return response['choices'][0]['message']['content'].strip()
 
 def clear_uploaded_files():
     """Clear all uploaded files and reset the session state."""
