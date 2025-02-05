@@ -125,7 +125,7 @@ def grade_with_openai(guideline, answer, question_count):
 
     # API call
     response = openai.ChatCompletion.create(
-        model="gpt-4o",  # Using gpt-4o as requested
+        model="gpt-4",  # Using gpt-4 as requested
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
