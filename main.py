@@ -11,9 +11,7 @@ import subprocess
 from io import BytesIO
 import os
 
-openai.api_key = st.secrets["OPENAI_API_KEY"]
-
-
+openai.api_key = st.secrets["openai"]["API_KEY"]
 
 def extract_and_clean_text(file):
     criteria = extract_text(file).strip()
