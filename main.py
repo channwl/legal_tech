@@ -17,13 +17,13 @@ st.set_page_config(
     page_title="법률 채점 프로그램 | FELT"
 )
 
-# API 키 불러오기
-api_key = st.secrets.get("general", {}).get("API_KEY", None)
-
+api_key = st.secrets["general"]["API_KEY"]  # secrets.toml에서 API 키를 가져옵니다.
 if api_key is None:
     st.error("API 키가 설정되지 않았습니다. secrets.toml 또는 Streamlit Cloud Secrets에서 설정하세요.")
 else:
+    openai.api_key = api_key  # OpenAI API 키 설정
     st.success("API 키가 정상적으로 로드되었습니다.")
+
 
 def extract_and_clean_text(file):
     criteria = extract_text(file).strip()
@@ -125,7 +125,7 @@ def grade_with_openai(guideline, answer, question_count):
 
     # API call
     response = openai.ChatCompletion.create(
-        model="gpt-4o",  # Using gpt-4o as requested
+        model="gpt-4",  # Using gpt-4o as requested
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
