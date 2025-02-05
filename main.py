@@ -10,7 +10,9 @@ import os
 import subprocess
 from io import BytesIO
 import os
-
+import time
+# 예시: 1초 간격으로 호출 간격을 늘려주는 코드
+time.sleep(1)  # 1초 대기
 openai.api_key = st.secrets["openai"]["API_KEY"]
 
 def extract_and_clean_text(file):
