@@ -125,15 +125,24 @@ def grade_with_openai(guideline, answer, question_count):
         answer=answer
     )
 
-    # Ensure you're using the correct model name
-    response = openai.ChatCompletion.create(
-        model="gpt-4",  # Use the correct model name here
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
-        temperature=0,
-    )
+    # Ensure you're using the correct model name (gpt-4 or gpt-3.5-turbo)
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4",  # Or "gpt-3.5-turbo" depending on your use case
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0,
+        )
+        # Return the response content
+        return response['choices'][0]['message']['content'].strip()
+
+    except openai.error.OpenAIError as e:
+        # Handle any OpenAI errors (like rate limits, invalid model, etc.)
+        print(f"Error: {e}")
+        return "An error occurred while grading."
+
 
     # Return the response content
     return response['choices'][0]['message']['content'].strip()
