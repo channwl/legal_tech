@@ -9,12 +9,7 @@ import re
 import os
 import subprocess
 
-import os
-
-openai.api_key = st.secrets["openai"]["OPENAI_API_KEY"]
-st.write(f"API Key: {api_key}")
-
-
+api_key = st.secrets["general"]["API_KEY"]
 
 def extract_and_clean_text(file):
     criteria = extract_text(file).strip()
